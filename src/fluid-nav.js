@@ -1,59 +1,103 @@
 const NAV_ITEMS = ["Home", "Search", "Saved", "Profile"];
-const state = { index: 0, dragging: false, startX: 0, currentX: 0, moved: false };
-const getIndex = () => Math.max(0, NAV_ITEMS.indexOf(document.body.dataset.ximoSection || "Home"));
-const setIndex = (i) => {
-  const index = Math.max(0, Math.min(NAV_ITEMS.length - 1, i));
-  document.body.dataset.ximoSection = NAV_ITEMS[index];
-  const nav = document.querySelector(".bottom-nav");
-  if (!nav) return;
-  nav.style.setProperty("--ximo-progress", String(index));
-  nav.querySelectorAll(".ximo-fluid-dot").forEach(dot => dot.style.transform = `translateX(${index * 100}%)`);
+let nav = null;
+let dot = null;
+let activeIndex = 0;
+let dragging = false;
+let startX = 0;
+let currentX = 0;
+let moved = false;
+let swipeStartX = 0;
+let swipeStartY = 0;
+let swipeTracking = false;
+
+const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+const currentNavIndex = () => {
+  const active = document.querySelector(".bottom-nav .nav-item.active");
+  const buttons = [...document.querySelectorAll(".bottom-nav .nav-item")];
+  const i = buttons.indexOf(active);
+  return i >= 0 ? clamp(i, 0, NAV_ITEMS.length - 1) : activeIndex;
 };
-const go = (index) => {
-  const buttons = document.querySelectorAll(".bottom-nav .nav-item");
-  const button = buttons[index];
-  if (button && !button.disabled) button.click();
-  setIndex(index);
+const updateIndicator = (index, animate = true) => {
+  activeIndex = clamp(index, 0, NAV_ITEMS.length - 1);
+  if (!nav || !dot) return;
+  dot.style.transition = animate ? "transform .24s cubic-bezier(.2,.8,.2,1)" : "none";
+  dot.style.transform = `translateX(${activeIndex * 100}%)`;
+  document.body.dataset.ximoSection = NAV_ITEMS[activeIndex];
+};
+const goTo = index => {
+  const buttons = [...document.querySelectorAll(".bottom-nav .nav-item")];
+  const target = buttons[clamp(index, 0, buttons.length - 1)];
+  if (!target) return;
+  target.click();
+  requestAnimationFrame(() => updateIndicator(currentNavIndex()));
 };
 const install = () => {
-  const nav = document.querySelector(".bottom-nav");
-  if (!nav || nav.dataset.fluidReady === "1") return;
+  const nextNav = document.querySelector(".bottom-nav");
+  if (!nextNav || nextNav === nav) return;
+  nav = nextNav;
   nav.dataset.fluidReady = "1";
   const track = document.createElement("span");
   track.className = "ximo-fluid-track";
-  const dot = document.createElement("span");
+  const rail = document.createElement("span");
+  rail.className = "ximo-fluid-rail";
+  dot = document.createElement("span");
   dot.className = "ximo-fluid-dot";
+  track.appendChild(rail);
   track.appendChild(dot);
   nav.prepend(track);
+
   const onDown = e => {
     if (e.target.closest(".create-button")) return;
-    state.dragging = true; state.moved = false; state.startX = e.clientX; state.currentX = e.clientX;
-    nav.setPointerCapture?.(e.pointerId); nav.classList.add("is-dragging");
+    dragging = true; moved = false; startX = currentX = e.clientX;
+    nav.classList.add("is-dragging");
+    nav.setPointerCapture?.(e.pointerId);
   };
   const onMove = e => {
-    if (!state.dragging) return;
-    state.currentX = e.clientX;
-    if (Math.abs(state.currentX - state.startX) > 8) state.moved = true;
-    if (!state.moved) return;
-    const delta = state.currentX - state.startX;
-    const progress = Math.max(0, Math.min(NAV_ITEMS.length - 1, getIndex() - delta / Math.max(120, nav.clientWidth / 2)));
+    if (!dragging) return;
+    currentX = e.clientX;
+    if (Math.abs(currentX - startX) > 7) moved = true;
+    if (!moved) return;
+    const width = Math.max(140, nav.clientWidth / NAV_ITEMS.length);
+    const delta = currentX - startX;
+    const progress = clamp(activeIndex - delta / width, 0, NAV_ITEMS.length - 1);
+    dot.style.transition = "none";
     dot.style.transform = `translateX(${progress * 100}%)`;
   };
   const onUp = e => {
-    if (!state.dragging) return;
-    state.dragging = false; nav.classList.remove("is-dragging");
-    if (state.moved) {
-      const delta = state.currentX - state.startX;
-      if (Math.abs(delta) > 35) go(getIndex() + (delta < 0 ? 1 : -1)); else setIndex(getIndex());
+    if (!dragging) return;
+    dragging = false; nav.classList.remove("is-dragging");
+    if (moved) {
+      const delta = currentX - startX;
+      if (Math.abs(delta) > 32) goTo(activeIndex + (delta < 0 ? 1 : -1));
+      else updateIndicator(activeIndex);
     }
   };
   nav.addEventListener("pointerdown", onDown);
   nav.addEventListener("pointermove", onMove);
   nav.addEventListener("pointerup", onUp);
   nav.addEventListener("pointercancel", onUp);
-  nav.querySelectorAll(".nav-item").forEach((button, i) => button.addEventListener("click", () => setIndex(i)));
-  setIndex(getIndex());
+  [...nav.querySelectorAll(".nav-item")].forEach((button, i) => button.addEventListener("click", () => {
+    setTimeout(() => updateIndicator(i), 0);
+  }));
+  updateIndicator(currentNavIndex(), false);
 };
+
+const onPagePointerDown = e => {
+  if (e.target.closest(".bottom-nav,.post-detail,.create-backdrop,.account-settings,#ximo-auth-root,input,textarea,select,button,a")) return;
+  swipeTracking = true; swipeStartX = e.clientX; swipeStartY = e.clientY;
+};
+const onPagePointerUp = e => {
+  if (!swipeTracking) return;
+  swipeTracking = false;
+  const dx = e.clientX - swipeStartX;
+  const dy = e.clientY - swipeStartY;
+  if (Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 1.25) return;
+  const i = currentNavIndex();
+  goTo(i + (dx < 0 ? 1 : -1));
+};
+
+document.addEventListener("pointerdown", onPagePointerDown, { passive: true });
+document.addEventListener("pointerup", onPagePointerUp, { passive: true });
 const boot = () => install();
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot, { once: true }); else boot();
 new MutationObserver(install).observe(document.body, { childList: true });
