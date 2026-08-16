@@ -21,6 +21,7 @@ function App() {
   const [active, setActive] = useState("Home");
   const [view, setView] = useState("home");
   const [query, setQuery] = useState("");
+  const [selectedPost, setSelectedPost] = useState(null);
   const [saved, setSaved] = useState(() => JSON.parse(localStorage.getItem("ximo-saved") || "[]"));
   const [userPosts, setUserPosts] = useState(() => JSON.parse(localStorage.getItem("ximo-posts") || "[]"));
   const [showCreate, setShowCreate] = useState(false);
@@ -45,6 +46,11 @@ function App() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  useEffect(() => {
+    document.body.style.overflow = selectedPost ? "hidden" : "";
+    return () => { document.body.style.overflow = ""; };
+  }, [selectedPost]);
+
   const posts = useMemo(() => [...userPosts, ...seedPosts], [userPosts]);
   const visiblePosts = posts.filter((post) => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -64,6 +70,13 @@ function App() {
     setQuery(""); setActive(item); setView("home"); setNavHidden(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
+
+  const openPost = (post) => {
+    setSelectedPost(post);
+    setNavHidden(false);
+  };
+
+  const closePost = () => setSelectedPost(null);
 
   const toggleSave = (id) => setSaved((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
 
@@ -89,13 +102,15 @@ function App() {
   ) : (
     <section className="feed">
       {postsToRender.map((post) => (
-        <article className={`card ${post.height}`} key={post.id}>
+        <article className={`card ${post.height}`} key={post.id} onClick={() => openPost(post)} tabIndex="0" onKeyDown={(event) => event.key === "Enter" && openPost(post)}>
           <img src={post.image} alt={post.title} />
-          <div className="card-overlay"><div><span>{post.category}</span><h2>{post.title}</h2></div><button className={saved.includes(post.id) ? "save saved" : "save"} onClick={() => toggleSave(post.id)} aria-label="Save idea">{saved.includes(post.id) ? "♥" : "♡"}</button></div>
+          <div className="card-overlay"><div><span>{post.category}</span><h2>{post.title}</h2></div><button className={saved.includes(post.id) ? "save saved" : "save"} onClick={(event) => { event.stopPropagation(); toggleSave(post.id); }} aria-label="Save idea">{saved.includes(post.id) ? "♥" : "♡"}</button></div>
         </article>
       ))}
     </section>
   );
+
+  const relatedPosts = selectedPost ? posts.filter((post) => post.id !== selectedPost.id && post.category === selectedPost.category).slice(0, 4) : [];
 
   return (
     <div className="app-shell">
@@ -129,6 +144,21 @@ function App() {
           </>
         )}
       </main>
+
+      {selectedPost && (
+        <div className="post-detail" role="dialog" aria-modal="true" aria-label={`${selectedPost.title} detail`}>
+          <button className="detail-close" onClick={closePost} aria-label="Close post">×</button>
+          <div className="detail-image-wrap">
+            <img className="detail-image" src={selectedPost.image} alt={selectedPost.title} />
+          </div>
+          <div className="detail-content">
+            <div className="detail-meta"><span>{selectedPost.category}</span><button className={saved.includes(selectedPost.id) ? "detail-save saved" : "detail-save"} onClick={() => toggleSave(selectedPost.id)}>{saved.includes(selectedPost.id) ? "♥ Saved" : "♡ Save"}</button></div>
+            <h1>{selectedPost.title}</h1>
+            <p>Save this idea to your Ximo collection and come back to it whenever you need inspiration.</p>
+            {relatedPosts.length > 0 && <div className="related-section"><div className="discovery-heading"><h2>More like this</h2><span>{selectedPost.category}</span></div><div className="related-grid">{relatedPosts.map((post) => <button className="related-card" key={post.id} onClick={() => openPost(post)}><img src={post.image} alt={post.title} /><span>{post.title}</span></button>)}</div></div>}
+          </div>
+        </div>
+      )}
 
       {showCreate && (
         <div className="create-backdrop" onMouseDown={(event) => event.target === event.currentTarget && setShowCreate(false)}>
