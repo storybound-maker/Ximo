@@ -11,10 +11,15 @@ const seedPosts = [
   { id: 6, title: "Clean kitchen inspiration", category: "Kitchen", height: "short", image: "https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?auto=format&fit=crop&w=900&q=85" }
 ];
 
-const categories = ["Home", "Cozy", "Workspace", "Bedroom", "Plants", "Kitchen", "Saved"];
+const categories = ["Home", "Cozy", "Workspace", "Bedroom", "Plants", "Kitchen"];
+const discoveryCategories = [
+  { name: "Home", icon: "⌂" }, { name: "Cozy", icon: "☁" }, { name: "Workspace", icon: "▣" },
+  { name: "Bedroom", icon: "◒" }, { name: "Plants", icon: "✿" }, { name: "Kitchen", icon: "◇" }
+];
 
 function App() {
   const [active, setActive] = useState("Home");
+  const [view, setView] = useState("home");
   const [query, setQuery] = useState("");
   const [saved, setSaved] = useState(() => JSON.parse(localStorage.getItem("ximo-saved") || "[]"));
   const [userPosts, setUserPosts] = useState(() => JSON.parse(localStorage.getItem("ximo-posts") || "[]"));
@@ -42,11 +47,23 @@ function App() {
 
   const posts = useMemo(() => [...userPosts, ...seedPosts], [userPosts]);
   const visiblePosts = posts.filter((post) => {
-    const matchesSearch = `${post.title} ${post.category}`.toLowerCase().includes(query.toLowerCase());
-    const matchesTab = active === "Home" || active === "Saved" ? true : post.category === active;
+    const normalizedQuery = query.trim().toLowerCase();
+    const matchesSearch = !normalizedQuery || `${post.title} ${post.category}`.toLowerCase().includes(normalizedQuery);
+    const matchesTab = active === "Home" || active === "Saved" || active === "Search" ? true : post.category === active;
     const matchesSaved = active === "Saved" ? saved.includes(post.id) : true;
     return matchesSearch && matchesTab && matchesSaved;
   });
+
+  const openSearch = () => {
+    setView("search"); setActive("Search"); setNavHidden(false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    setTimeout(() => document.querySelector(".search-page-input")?.focus(), 120);
+  };
+
+  const chooseCategory = (item) => {
+    setQuery(""); setActive(item); setView("home"); setNavHidden(false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   const toggleSave = (id) => setSaved((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
 
@@ -63,29 +80,54 @@ function App() {
     event.preventDefault();
     if (!title.trim() || !image) return;
     setUserPosts((current) => [{ id: `local-${Date.now()}`, title: title.trim(), category, height: "medium", image }, ...current]);
-    setTitle(""); setCategory("Home"); setImage(""); setImageName(""); setShowCreate(false); setActive("Home");
+    setTitle(""); setCategory("Home"); setImage(""); setImageName(""); setShowCreate(false); setActive("Home"); setView("home");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const renderFeed = (postsToRender = visiblePosts) => postsToRender.length === 0 ? (
+    <div className="empty-state"><div className="empty-icon">⌕</div><h2>No ideas found.</h2><p>Try a different search or explore another category.</p><button onClick={() => { setQuery(""); setActive("Search"); }}>Clear search</button></div>
+  ) : (
+    <section className="feed">
+      {postsToRender.map((post) => (
+        <article className={`card ${post.height}`} key={post.id}>
+          <img src={post.image} alt={post.title} />
+          <div className="card-overlay"><div><span>{post.category}</span><h2>{post.title}</h2></div><button className={saved.includes(post.id) ? "save saved" : "save"} onClick={() => toggleSave(post.id)} aria-label="Save idea">{saved.includes(post.id) ? "♥" : "♡"}</button></div>
+        </article>
+      ))}
+    </section>
+  );
+
   return (
     <div className="app-shell">
-      <header className="topbar"><div className="brand">ximo<span>.</span></div><div className="profile-button">S</div></header>
+      <header className="topbar"><button className="brand brand-button" onClick={() => { setView("home"); setActive("Home"); setQuery(""); window.scrollTo({ top: 0, behavior: "smooth" }); }}>ximo<span>.</span></button><button className="profile-button" onClick={() => setActive("Profile")}>S</button></header>
       <main>
-        <section className="hero">
-          <p className="eyebrow">YOUR SPACE. YOUR IDEAS.</p>
-          <h1>Make your space<br /><span>feel like you.</span></h1>
-          <p className="hero-copy">Discover rooms, setups, styles and little ideas worth saving.</p>
-          <div className="search-box"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search ideas..." />{query && <button onClick={() => setQuery("")}>×</button>}</div>
-        </section>
-        <div className="category-row">{categories.map((item) => <button key={item} className={active === item ? "category active" : "category"} onClick={() => setActive(item)}>{item}</button>)}</div>
-        <section className="feed">
-          {visiblePosts.length === 0 ? <div className="empty-state"><h2>Nothing here yet.</h2><p>Try another search or save some ideas.</p></div> : visiblePosts.map((post) => (
-            <article className={`card ${post.height}`} key={post.id}>
-              <img src={post.image} alt={post.title} />
-              <div className="card-overlay"><div><span>{post.category}</span><h2>{post.title}</h2></div><button className={saved.includes(post.id) ? "save saved" : "save"} onClick={() => toggleSave(post.id)} aria-label="Save idea">{saved.includes(post.id) ? "♥" : "♡"}</button></div>
-            </article>
-          ))}
-        </section>
+        {view === "search" ? (
+          <section className="search-page">
+            <div className="search-page-head">
+              <p className="eyebrow">DISCOVER ON XIMO</p>
+              <h1>Find your next<br /><span>great idea.</span></h1>
+              <div className="search-box search-page-box"><span>⌕</span><input className="search-page-input" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search rooms, setups, styles..." autoComplete="off" />{query && <button onClick={() => setQuery("")}>×</button>}</div>
+              {query ? <p className="search-result-label">{visiblePosts.length} {visiblePosts.length === 1 ? "idea" : "ideas"} for <strong>“{query}”</strong></p> : <p className="search-result-label">Explore ideas by category or start typing above.</p>}
+            </div>
+            {!query && <>
+              <div className="discovery-heading"><h2>Explore categories</h2><span>Pick a vibe</span></div>
+              <div className="discovery-grid">{discoveryCategories.map((item) => <button key={item.name} className="discovery-card" onClick={() => chooseCategory(item.name)}><span>{item.icon}</span><strong>{item.name}</strong><small>{posts.filter((post) => post.category === item.name).length} ideas</small></button>)}</div>
+              <div className="discovery-heading"><h2>Popular ideas</h2><span>Fresh inspiration</span></div>
+            </>}
+            {renderFeed(query ? visiblePosts : posts)}
+          </section>
+        ) : (
+          <>
+            <section className="hero">
+              <p className="eyebrow">YOUR SPACE. YOUR IDEAS.</p>
+              <h1>Make your space<br /><span>feel like you.</span></h1>
+              <p className="hero-copy">Discover rooms, setups, styles and little ideas worth saving.</p>
+              <div className="search-box"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} onFocus={openSearch} placeholder="Search ideas..." /></div>
+            </section>
+            <div className="category-row">{["Home", ...categories].filter((item, index, arr) => arr.indexOf(item) === index).map((item) => <button key={item} className={active === item ? "category active" : "category"} onClick={() => chooseCategory(item)}>{item}</button>)}</div>
+            {renderFeed()}
+          </>
+        )}
       </main>
 
       {showCreate && (
@@ -98,18 +140,18 @@ function App() {
             </label>
             {imageName && <p className="file-name">{imageName}</p>}
             <label className="field-label">Title<input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Give your idea a name..." maxLength={80} /></label>
-            <label className="field-label">Category<select value={category} onChange={(event) => setCategory(event.target.value)}>{categories.filter((item) => item !== "Saved").map((item) => <option key={item}>{item}</option>)}</select></label>
+            <label className="field-label">Category<select value={category} onChange={(event) => setCategory(event.target.value)}>{categories.map((item) => <option key={item}>{item}</option>)}</select></label>
             <button className="publish-button" type="submit" disabled={!title.trim() || !image}>Publish idea</button>
           </form>
         </div>
       )}
 
       <nav className={`bottom-nav ${navHidden ? "nav-hidden" : ""}`} aria-label="Main navigation">
-        <button className={active === "Home" ? "nav-item active" : "nav-item"} onClick={() => setActive("Home")}><span>⌂</span><small>Home</small></button>
-        <button className="nav-item" onClick={() => { setActive("Home"); document.querySelector(".search-box input")?.focus(); }}><span>⌕</span><small>Search</small></button>
+        <button className={active === "Home" && view === "home" ? "nav-item active" : "nav-item"} onClick={() => { setView("home"); setActive("Home"); setQuery(""); window.scrollTo({ top: 0, behavior: "smooth" }); }}><span>⌂</span><small>Home</small></button>
+        <button className={active === "Search" ? "nav-item active" : "nav-item"} onClick={openSearch}><span>⌕</span><small>Search</small></button>
         <button className="create-button" onClick={() => { setNavHidden(false); setShowCreate(true); }} aria-label="Create">+</button>
-        <button className={active === "Saved" ? "nav-item active" : "nav-item"} onClick={() => setActive("Saved")}><span>♡</span><small>Saved</small></button>
-        <button className="nav-item" onClick={() => setActive("Profile")}><span>◯</span><small>Profile</small></button>
+        <button className={active === "Saved" ? "nav-item active" : "nav-item"} onClick={() => { setView("home"); setActive("Saved"); setQuery(""); window.scrollTo({ top: 0, behavior: "smooth" }); }}><span>♡</span><small>Saved</small></button>
+        <button className={active === "Profile" ? "nav-item active" : "nav-item"} onClick={() => setActive("Profile")}><span>◯</span><small>Profile</small></button>
       </nav>
     </div>
   );
