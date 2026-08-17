@@ -1,0 +1,15 @@
+/* Stable Ximo navigation and theme compatibility layer. */
+:root{--ximo-orange:#ff6a00;--ximo-orange-dark:#e95700;--ximo-soft:#fff1e8}
+body{color:#171717;background:#fff}
+.topbar,.app-shell{background:#fff}
+.brand,.brand-button{color:#171717}.brand span,.eyebrow,.detail-category,.collection-count{color:var(--ximo-orange)}
+.hero h1 span,.search-page-head h1 span{color:var(--ximo-orange)}
+.bottom-nav{display:flex;align-items:center;justify-content:space-around;gap:4px;position:fixed;right:12px;bottom:12px;left:12px;z-index:300;height:64px;padding:5px 8px;border:1px solid #ececec;border-radius:24px;background:rgba(255,255,255,.97);box-shadow:0 14px 45px rgba(0,0,0,.13);backdrop-filter:blur(18px)}
+.bottom-nav>button{display:flex;width:52px;height:54px;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;border:0;background:transparent;color:#999;font-size:22px;line-height:1}
+.bottom-nav>button span{font-size:9px;font-weight:800;line-height:1}
+.bottom-nav>button.active{color:var(--ximo-orange)}
+.bottom-nav .nav-create{display:grid;width:50px;height:50px;place-items:center;margin-top:-22px;border:5px solid #fff;border-radius:50%;background:var(--ximo-orange);color:#fff;font-size:27px;box-shadow:0 8px 22px rgba(255,106,0,.32)}
+.bottom-nav.nav-hidden{transform:translateY(calc(100% + 24px));opacity:0;pointer-events:none}
+.category-strip button.active{background:var(--ximo-orange);color:#fff;border-color:var(--ximo-orange)}
+.primary,.hero-create,.load-more{background:var(--ximo-orange);color:#fff}
+@media(min-width:700px){.bottom-nav{right:50%;left:auto;width:430px;transform:translateX(50%)}.bottom-nav.nav-hidden{transform:translate(50%,calc(100% + 24px))}}
